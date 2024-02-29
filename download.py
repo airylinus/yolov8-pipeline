@@ -65,11 +65,12 @@ if not os.path.exists(output_directory):
 
 if __name__ == "__main__":
     import sys
-    if len(sys.argv) != 4:
+    if len(sys.argv) != 3:
+        print("error parameters : len(sys.argv) != 4", len(sys.argv))
         print("Usage: python download.py <file_path> <output_directory>")
         print("Example: python download.py image-urls.txt app_with_marked")
         exit(1)
-    url_file = sys.argv[2]
-    output_directory = sys.argv[3]
+    url_file = sys.argv[1]
+    output_directory = sys.argv[2]
     # download_images("images-withmark.txt", "app_with_marked")
     download_images(url_file, output_directory)
