@@ -7,7 +7,7 @@ def run(dataset_dir):
     if not os.path.exists(dataset_dir):
         print("Dataset directory not found: {}".format(dataset_dir))
         exit(1)
-    labels_file = os.path.join(dataset_dir, "fixed_labels.txt")
+    labels_file = os.path.join(dataset_dir, "labels.txt")
     if not os.path.exists(labels_file):
         print("Labels file not found: {}".format(labels_file))
         exit(1)
