@@ -147,6 +147,25 @@ Model predictions with class index 0 will be labeled as "apple", index 1 as "ban
 - Process images in batches by organizing them in subdirectories
 - Use GPU-enabled models for faster inference on large datasets
 
+#### Duplicate Detection (重复检测)
+The script includes intelligent duplicate detection to prevent the same object from being detected multiple times when appending to existing annotation files.
+
+**How it works:**
+- When appending to existing annotation files, the script compares new detections with existing annotations
+- If two bounding boxes of the same label have an IOU (Intersection over Union) greater than 85%, the new detection is considered a duplicate
+- Duplicate detections are filtered out, preserving the original annotations
+- A log message is printed for each filtered duplicate detection
+
+**Benefits:**
+- Prevents annotation file pollution with redundant detections
+- Maintains data quality when re-running inference on the same images
+- Useful for iterative annotation workflows
+
+**IOU Threshold:**
+- Default threshold: 85% (configurable via code modification)
+- Only compares detections with the same label
+- Preserves the original annotation's position and attributes
+
 #### Error Handling
 The script includes comprehensive error handling for:
 - Missing model files

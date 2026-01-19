@@ -97,6 +97,103 @@ class YOLOInference:
             [float(x1), float(y2)]
         ]
 
+    def calculate_iou(self, bbox1: List[float], bbox2: List[float]) -> float:
+        """计算两个边界框的IOU (Intersection over Union)
+
+        Args:
+            bbox1: 第一个边界框 [x1, y1, x2, y2]
+            bbox2: 第二个边界框 [x1, y1, x2, y2]
+
+        Returns:
+            IOU 值 (0.0 到 1.0)
+        """
+        x1_1, y1_1, x2_1, y2_1 = bbox1
+        x1_2, y1_2, x2_2, y2_2 = bbox2
+
+        # 计算交集区域
+        x1_inter = max(x1_1, x1_2)
+        y1_inter = max(y1_1, y1_2)
+        x2_inter = min(x2_1, x2_2)
+        y2_inter = min(y2_1, y2_2)
+
+        # 没有交集
+        if x2_inter <= x1_inter or y2_inter <= y1_inter:
+            return 0.0
+
+        # 计算交集面积
+        inter_area = (x2_inter - x1_inter) * (y2_inter - y1_inter)
+
+        # 计算两个框的面积
+        area1 = (x2_1 - x1_1) * (y2_1 - y1_1)
+        area2 = (x2_2 - x1_2) * (y2_2 - y1_2)
+
+        # 计算并集面积
+        union_area = area1 + area2 - inter_area
+
+        # 计算IOU
+        if union_area == 0:
+            return 0.0
+
+        return inter_area / union_area
+
+    def points_to_bbox(self, points: List[List[float]]) -> List[float]:
+        """将4个点的坐标转换为边界框格式
+
+        Args:
+            points: [[x1,y1], [x2,y1], [x2,y2], [x1,y2]]
+
+        Returns:
+            [x1, y1, x2, y2]
+        """
+        x_coords = [point[0] for point in points]
+        y_coords = [point[1] for point in points]
+
+        x1 = min(x_coords)
+        y1 = min(y_coords)
+        x2 = max(x_coords)
+        y2 = max(y_coords)
+
+        return [x1, y1, x2, y2]
+
+    def filter_duplicate_detections(self, new_shapes: List[dict],
+                                  existing_shapes: List[dict],
+                                  iou_threshold: float = 0.85) -> List[dict]:
+        """过滤重复的检测结果
+
+        Args:
+            new_shapes: 新的检测结果
+            existing_shapes: 现有的标注
+            iou_threshold: IOU阈值，大于此值认为是重复检测
+
+        Returns:
+            过滤后的新检测结果列表
+        """
+        filtered_shapes = []
+
+        for new_shape in new_shapes:
+            is_duplicate = False
+
+            # 将新检测的points转换为bbox
+            new_bbox = self.points_to_bbox(new_shape["points"])
+            new_label = new_shape["label"]
+
+            # 检查与现有标注的IOU
+            for existing_shape in existing_shapes:
+                if existing_shape["label"] == new_label:  # 只比较相同标签的标注
+                    existing_bbox = self.points_to_bbox(existing_shape["points"])
+                    iou = self.calculate_iou(new_bbox, existing_bbox)
+
+                    if iou > iou_threshold:
+                        print(f"Duplicate detection found for {new_label} "
+                              f"(IOU: {iou:.3f} > {iou_threshold}), skipping...")
+                        is_duplicate = True
+                        break
+
+            if not is_duplicate:
+                filtered_shapes.append(new_shape)
+
+        return filtered_shapes
+
     def predict_image(self, image_path: str, conf_threshold: float = 0.25) -> List[dict]:
         """对单张图片进行推理
 
@@ -183,11 +280,14 @@ class YOLOInference:
                 json_path = os.path.join(output_dir, json_filename)
 
                 # 检查是否已存在标注文件
+                existing_shapes = []
                 if os.path.exists(json_path):
                     # 读取现有文件
                     with open(json_path, 'r', encoding='utf-8') as f:
                         annotation_data = json.load(f)
-                    print(f"Appending to existing annotation file: {json_path}")
+                    existing_shapes = annotation_data.get("shapes", [])
+                    print(f"Appending to existing annotation file: {json_path} "
+                          f"({len(existing_shapes)} existing annotations)")
                 else:
                     # 创建新文件
                     annotation_data = self.create_annotation_template(image_path)
@@ -197,13 +297,29 @@ class YOLOInference:
                 new_shapes = self.predict_image(image_path, conf_threshold)
 
                 if new_shapes:
-                    # 添加新的标注
-                    annotation_data["shapes"].extend(new_shapes)
-                    print(f"Added {len(new_shapes)} detections")
+                    # 过滤重复检测
+                    if existing_shapes:
+                        filtered_shapes = self.filter_duplicate_detections(
+                            new_shapes, existing_shapes, iou_threshold=0.85)
+                        added_count = len(filtered_shapes)
+                        skipped_count = len(new_shapes) - added_count
+                        if skipped_count > 0:
+                            print(f"Filtered {skipped_count} duplicate detections, "
+                                  f"adding {added_count} new detections")
+                    else:
+                        filtered_shapes = new_shapes
+                        added_count = len(filtered_shapes)
+                        print(f"Added {added_count} detections")
 
-                    # 保存文件
-                    with open(json_path, 'w', encoding='utf-8') as f:
-                        json.dump(annotation_data, f, indent=2, ensure_ascii=False)
+                    if filtered_shapes:  # 只有在有新检测时才保存
+                        # 添加过滤后的新标注
+                        annotation_data["shapes"].extend(filtered_shapes)
+
+                        # 保存文件
+                        with open(json_path, 'w', encoding='utf-8') as f:
+                            json.dump(annotation_data, f, indent=2, ensure_ascii=False)
+                    else:
+                        print("No new detections to add after filtering")
 
                     processed_count += 1
                 else:
