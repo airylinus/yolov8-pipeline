@@ -19,7 +19,7 @@ def run(dataset_dir):
         f.write("train: ./train/images\n")
         f.write("val: ./val/images\n")
         f.write("nc: " + str(len(labels)) + "\n")
-        f.write("name: \n")
+        f.write("names: \n")
         for _, label in enumerate(labels):
             f.write("  - " + label + "\n")
 

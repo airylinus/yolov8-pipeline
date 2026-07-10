@@ -234,10 +234,17 @@ class RectLabelConverter(BaseLabelConverter):
 
                 class_index = self.classes.index(label)
 
-                x_center = (points[0][0] + points[2][0]) / (2 * image_width)
-                y_center = (points[0][1] + points[2][1]) / (2 * image_height)
-                width = abs(points[2][0] - points[0][0]) / image_width
-                height = abs(points[2][1] - points[0][1]) / image_height
+                x_coordinates = [point[0] for point in points]
+                y_coordinates = [point[1] for point in points]
+                x_min = min(x_coordinates)
+                x_max = max(x_coordinates)
+                y_min = min(y_coordinates)
+                y_max = max(y_coordinates)
+
+                x_center = (x_min + x_max) / (2 * image_width)
+                y_center = (y_min + y_max) / (2 * image_height)
+                width = (x_max - x_min) / image_width
+                height = (y_max - y_min) / image_height
 
                 # x_center = (points[0][0] + points[1][0]) / (2 * image_width)
                 # y_center = (points[0][1] + points[1][1]) / (2 * image_height)
